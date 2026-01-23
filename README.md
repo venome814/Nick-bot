@@ -1,1 +1,2 @@
-# Nick-bot
+# SKELETON NICK BOT 
+DEVELOP BY: VENOME 
