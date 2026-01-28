@@ -1,50 +1,132 @@
 const { PermissionsBitField } = require("discord.js");
 const config = require("../config");
 
-module.exports = async (message) => {
-  if (message.author.bot || !message.guild) return;
-  if (message.channel.id !== config.nicknameChannelId) return;
+module.exports = {
+  name: "messageCreate",
+  async execute(message) {
+    if (message.author.bot) return;
+    if (!message.guild) return;
 
-  const member = message.member;
-  const nickname = message.content.trim();
+    // Only nickname channel
+    if (message.channel.id !== config.nicknameChannelId) return;
 
-  // Delete user message
-  setTimeout(() => message.delete().catch(() => {}), 1000);
+    const member = message.member;
+    const nickname = message.content.trim();
 
-  const isAdmin = member.permissions.has(PermissionsBitField.Flags.Administrator);
-  const hasOGRole = member.roles.cache.some(role =>
-    config.ogRoleIds.includes(role.id)
-  );
+    // Delete USER message
+    setTimeout(() => {
+      message.delete().catch(() => {});
+    }, 1000);
 
-  if (!hasOGRole && !isAdmin) {
-    return message.channel.send({
-      content: `⚠️ ${member.user.username}, ${config.noPermissionMessage}`
-    });
-  }
+    const isAdmin = member.permissions.has(
+      PermissionsBitField.Flags.Administrator
+    );
 
-  if (!member.manageable) return;
+    const hasOGRole = member.roles.cache.some(role =>
+      config.ogRoleIds.includes(role.id)
+    );
 
-  // Reset nickname
-  if (nickname.toLowerCase() === config.resetKeyword) {
+    // ❌ No permission
+    if (!hasOGRole && !isAdmin) {
+      const botMsg = await message.channel.send(
+        `❌ **${member.user.username}**, you must have the OG role to change your nickname.`
+      );
+
+      setTimeout(() => {
+        botMsg.delete().catch(() => {});
+      }, 5000);
+
+      return;
+    }
+
+    // Bot cannot manage user
+    if (!member.manageable) {
+      const botMsg = await message.channel.send(
+        "❌ I cannot change your nickname due to role hierarchy."
+      );
+
+      setTimeout(() => {
+        botMsg.delete().catch(() => {});
+      }, 5000);
+
+      return;
+    }
+
+    // Reset nickname
+    if (nickname.toLowerCase() === config.resetKeyword) {
+      try {
+        await member.setNickname(null);
+        const botMsg = await message.channel.send(
+          `✅ **${member.user.username}**, your nickname has been reset.`
+        );
+
+        setTimeout(() => {
+          botMsg.delete().catch(() => {});
+        }, 5000);
+
+        return;
+      } catch {
+        const botMsg = await message.channel.send(
+          "❌ Failed to reset nickname."
+        );
+
+        setTimeout(() => {
+          botMsg.delete().catch(() => {});
+        }, 5000);
+
+        return;
+      }
+    }
+
+    // Length check
+    if (nickname.length > config.maxNicknameLength) {
+      const botMsg = await message.channel.send(
+        "❌ Nickname must be under 32 characters."
+      );
+
+      setTimeout(() => {
+        botMsg.delete().catch(() => {});
+      }, 5000);
+
+      return;
+    }
+
+    // Banned words
+    if (
+      config.bannedWords.some(word =>
+        nickname.toLowerCase().includes(word)
+      )
+    ) {
+      const botMsg = await message.channel.send(
+        "❌ Inappropriate nickname."
+      );
+
+      setTimeout(() => {
+        botMsg.delete().catch(() => {});
+      }, 5000);
+
+      return;
+    }
+
+    // Change nickname
     try {
-      await member.setNickname(null);
-      return message.channel.send(`✅ ${member.user.username}, nickname reset.`);
-    } catch {}
-  }
+      await member.setNickname(nickname);
 
-  // Length check
-  if (nickname.length > config.maxNicknameLength) {
-    return message.channel.send("❌ Nickname must be under 32 characters");
-  }
+      const botMsg = await message.channel.send(
+        `✅ **${member.user.username}**, nickname updated to **${nickname}**`
+      );
 
-  // Banned words check
-  if (config.bannedWords.some(word => nickname.toLowerCase().includes(word))) {
-    return message.channel.send("❌ Inappropriate nickname");
-  }
+      setTimeout(() => {
+        botMsg.delete().catch(() => {});
+      }, 5000);
+    } catch {
+      const botMsg = await message.channel.send(
+        "❌ Failed to change nickname."
+      );
 
-  // Change nickname
-  try {
-    await member.setNickname(nickname);
-    message.channel.send(`✅ ${member.user.username}, nickname updated to ${nickname}`);
-  } catch {}
+      setTimeout(() => {
+        botMsg.delete().catch(() => {});
+      }, 5000);
+    }
+  }
 };
